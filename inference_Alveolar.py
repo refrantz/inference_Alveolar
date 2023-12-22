@@ -38,7 +38,7 @@ config = {
 
 def _numpy_reader(self, path=args["i"]):
         data = torch.from_numpy(nib.load(path).get_fdata()).float()
-        affine = torch.eye(4, requires_grad=False)
+        affine = torch.from_numpy(nib.load(path).affine)
         return data, affine
 
 image_scalar = tio.ScalarImage(args["i"], reader=_numpy_reader)
@@ -75,8 +75,10 @@ model = nn.DataParallel(model)
 if(args['cpu'] or torch.cuda.is_available() is False):      
     model.load_state_dict(torch.load(args["weights"], map_location=torch.device('cpu'))['state_dict'])
     model = model.module.to('cpu')
+    print("CPU")
 else:
     model.load_state_dict(torch.load(args["weights"])['state_dict'])
+    print("CUDA")
     
 
 model.eval()
@@ -111,7 +113,8 @@ with torch.no_grad():
     output = output.detach().cpu().numpy()  # BS, Z, H, W
     output = np.rot90(output, k=-1, axes=(0, 2)).copy()
 
-    nifti_img = nib.Nifti1Image(output, np.eye(4))
+    print(image_scalar.affine)
+    nifti_img = nib.Nifti1Image(output, image_scalar.affine)
 
     # Save the NIfTI image
     nib.save(nifti_img, args['o'])
